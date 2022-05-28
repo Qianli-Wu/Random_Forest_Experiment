@@ -1,0 +1,177 @@
+---
+title: "Final Project Part 1: Design of the Experiment"
+author: "Qianli Wu"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  pdf_document:
+    pandoc_args: --highlight-style=.my.theme
+header-includes:
+  - \usepackage{pdfpages}
+  - \usepackage{titling}
+  - \pretitle{\begin{center}\LARGE\includegraphics[width=12cm]{SpongeBob.jpeg}\\[\bigskipamount]}
+  - \posttitle{\end{center}}
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(AlgDesign)
+library(FrF2)
+library(corrplot)
+library(randomForest)
+```
+\newpage
+# Question 1. Propose a fractional factorial design for the problem. In addition, propose an experimental design constructed using the optimal design approach.  
+
+### The goal of this project is to identify the tuning parameters of random forest that affect the cross-validation accuracy.
+
+* We have seven tuning parameters:
+
+|    | Parameter           | Low Level               | High Level          |
+| -- | ------------------- | ----------------------- | ------------------- | 
+| A  | ntree               | 100                     | 1000                |
+| B  | replace             | 0                       | 1                   | 
+| C  | mtry                | 2                       | 6                   | 
+| D  | nodesize            | 1                       | 11                  |
+| E  | maxnodes            | 10                      | 1000                |
+| F  | classwt             | 0.5                     | 0.9                 |
+| G  | cutoff              | 0.2                     | 0.8                 |
+
+
+### Fractional Factorial Design  
+
+Since there are 7 factors each with 2 levels, a complete factorial design $2^7$ requires $128$ runs. Only 7 degrees of freedom correspond to main effects, 21 correspond to two-factor interactions, and the rest of 99 are associated with three-factor and higher interactions.  
+
+Due to limitation of resources, we can only run at most 35 tests. We assume that certain high-order interactions are negligible.  
+
+Since
+
+* The effect sparsity principle  
+
+* The projection property  
+
+* Sequential experimentation  
+
+We choose the One-Quarter Fraction of the $2^7$ Design, i.e., $2^{7-2}$ Design.  
+
+\newpage 
+Letting the 'FrF2' function recommend one design. Generally, the recommended designs are those in Table 8.14 in Chapter 8. The designs recommended by the function have the largest possible resolution. They also have the smallest aberration as defined in Section 8.4.1. Fractional factorial designs with minimum aberration are preferred because they minimize the aliasing among the factors' effects.  
+```{r}
+factors <- list(ntree = c(100, 1000), 
+                replace = c(0, 1), 
+                mtry = c(2, 6), 
+                nodesize = c(1,11), 
+                maxnodes = c(10, 1000), 
+                classwt = c(0.5, 0.9), 
+                cutoff = c(0.2, 0.8))
+my.design <- FrF2(nruns = 32, nfactors = 7, randomize = F, factor.names = factors)
+print(my.design)
+```
+\newpage 
+```{r}
+design.info(my.design)$catlg.entry
+design.info(my.design)$aliased
+```
+
+\newpage 
+### An Experimental Design Constructed using the Optimal Design Approach.  
+
+Suggestion is to start with 32 runs because multiples of 4 allows:
+
+* orthogonal design with diagonal variance-covariance matrix.
+* independent estimates of main effects, assuming interactions are ignored. (doubtful, since the upper left-corner of the 2.2 color map in Q2 is not 100% white)
+
+3 runs are saved for confirmation experiments or follow-up experiment. 
+
+```{r}
+# Create a full design for 7 factors each with 2 levels
+full.design <- FrF2(nruns = 128, nfactors = 7, randomize = F, factor.names = factors)
+# Consider a model with 35 runs
+alternative.design <- optFederov(~.^2, 
+                                 full.design, nTrials = 32, nRepeats = 1000)
+print.data.frame(alternative.design$design)
+```
+
+
+
+\newpage 
+# Question 2. Compare the optimal design with the fractional factorial design in practical and statistical terms. For instance, what is the performance of the designs for studying the main effects of the tuning parameters only? Can they estimate all two-parameter interactions? Why or why not? How do they compare in terms of multicollinearity?
+
+### 1.1 Color Map for Fractional Factorial Design  
+```{r}
+# Visualize the aliasing in the design.
+D.alt <- (desnum(my.design)) # Extract the design.
+# Create the model matrix including main effects and two-factor interactions.
+X.alt <- model.matrix(~.^2-1, data.frame(D.alt))
+
+# Create color map on pairwise correlations. 
+contrast.vectors.correlations.alt <- cor(X.alt)
+corrplot(contrast.vectors.correlations.alt, type = "full", addgrid.col = "gray",
+         tl.col = "black", tl.srt = 90, method = "color", tl.cex=0.5)
+```
+\ 
+
+
+From the color map above, we get there's no alias among main effects of the tuning parameters, which means the performance of our design for studying the main effects of the tuning parameters only will be great.  
+
+From the results of `design.info` in Question 1, we have AB=CF, AC=BF, and AF=BC, where "A=ntree", "B=replace", "C=mtry", "D=nodesize", "E=maxnodes", "F=classwt", and "G=cutoff". The aliasing is also shown on the map above, as the corresponding dark cells for `mtry:classwt` with `ntree:replace`, `replace:classwt` with `ntree:mtry`, and `replace:mtry` with `ntree:classwt`. 
+
+Therefore, we have the fractional factorial design's performance is best for all main effects and two-factor interactions except these aliasing factors. 
+
+
+
+\pagebreak
+### 2.1 Color Map for D-optimal Design  
+
+```{r}
+# Visualize the aliasing in the design.
+D.alt <- data.frame(alternative.design$design) # Extract the design.
+# Convert factors to -1 and 1
+D.alt <- sapply(D.alt,function(x)(as.integer(x) -1.5)*2 )
+X.alt <- model.matrix(~.^2-1, data.frame(D.alt))
+
+# Create color map on pairwise correlations.
+contrast.vectors.correlations.alt <- cor(X.alt)
+corrplot(contrast.vectors.correlations.alt, type = "full", addgrid.col = "gray",
+         tl.col = "black", tl.srt = 90, method = "color", tl.cex=0.5)
+```
+\ 
+
+From the D-optimal Design above, we have most cells with light colors. Therefore, we have the alias among the main effects,between the main effects and the specific interactions, and among the specific interactions are fairly small. 
+
+\pagebreak
+
+### 2.2 VIF for Fractional Factorial Design  
+```{r}
+# We need to include the intercept when computing the VIF.
+X.alt <- model.matrix(~.^2, data.frame(D.alt))
+# Variance-covariance matrix of 46-run design. Assuming sigma^2 = 1
+var.eff.one <- diag(solve(t(X.alt)%*%X.alt))
+# Set the left margin of plot be 1
+par(oma=c(0,1,0,0))
+#create horizontal bar chart to display each VIF value
+barplot(nrow(X.alt)*var.eff.one, main = "VIF Values", horiz = TRUE, col = "cyan", las=1, cex.names=0.4, xlim = c(0, 6))
+#add vertical line at 5
+abline(v = 5, lwd = 3, lty = 2)
+```
+\ 
+
+From the VIF plot above, we have there's no factor has VIF greater than 5. Thus, we don’t have a severe multi-collineairty or aliasing issue.  
+
+\pagebreak
+### 3. Compare
+
+* We have the fractional factorial design only suffers from multi-collinearity problem of these three pairs of aliased interactions. It will be great design if `mtry:classwt`, `ntree:replace`, `replace:classwt`, `ntree:mtry`, `replace:mtry`, and `ntree:classwt` are not potentially important effects.  
+
+* However, there's no serious multi-collinearity problem or aliasing issue for the D-optimal design. But the variances of more coefficient estimates are inflated trivially due to collinearity. 
+
+
+\newpage
+# Question 3. Recommend one experimental design between the two options in Question 1. Motivate your decision.  
+
+\newpage 
+# Question 4. Using a commercial software, the TAs and I came up with the experimental design shown in Table 2. How does your recommended design in the previous question compare with this one?
+
+
+
+```{r}
+source("CrossValidation_RandomForest/CrossValidation_RF.R")
+```
