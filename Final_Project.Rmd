@@ -1,10 +1,12 @@
 ---
-title: "Final Project Part 1: Design of the Experiment"
-author: "Qianli Wu"
+title: "Final Project"
+author: "Ovie Soman, Qianli Wu, Sebastian Rivera-Chepetla"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output: 
   pdf_document:
     pandoc_args: --highlight-style=.my.theme
+    toc: true
+    toc_depth: 3
 header-includes:
   - \usepackage{pdfpages}
   - \usepackage{titling}
@@ -56,12 +58,12 @@ We choose the One-Quarter Fraction of the $2^7$ Design, i.e., $2^{7-2}$ Design.
 Letting the 'FrF2' function recommend one design. Generally, the recommended designs are those in Table 8.14 in Chapter 8. The designs recommended by the function have the largest possible resolution. They also have the smallest aberration as defined in Section 8.4.1. Fractional factorial designs with minimum aberration are preferred because they minimize the aliasing among the factors' effects.  
 ```{r}
 factors <- list(ntree = c(100, 1000), 
-                replace = c(0, 1), 
                 mtry = c(2, 6), 
+                replace = c(0, 1), 
                 nodesize = c(1,11), 
-                maxnodes = c(10, 1000), 
                 classwt = c(0.5, 0.9), 
-                cutoff = c(0.2, 0.8))
+                cutoff = c(0.2, 0.8),
+                maxnodes = c(10, 1000))
 my.design <- FrF2(nruns = 32, nfactors = 7, randomize = F, factor.names = factors)
 print(my.design)
 ```
@@ -74,10 +76,7 @@ design.info(my.design)$aliased
 \newpage 
 ### An Experimental Design Constructed using the Optimal Design Approach.  
 
-Suggestion is to start with 32 runs because multiples of 4 allows:
-
-* orthogonal design with diagonal variance-covariance matrix.
-* independent estimates of main effects, assuming interactions are ignored. (doubtful, since the upper left-corner of the 2.2 color map in Q2 is not 100% white)
+Suggestion is to start with 32 runs
 
 3 runs are saved for confirmation experiments or follow-up experiment. 
 
@@ -112,9 +111,9 @@ corrplot(contrast.vectors.correlations.alt, type = "full", addgrid.col = "gray",
 
 From the color map above, we get there's no alias among main effects of the tuning parameters, which means the performance of our design for studying the main effects of the tuning parameters only will be great.  
 
-From the results of `design.info` in Question 1, we have AB=CF, AC=BF, and AF=BC, where "A=ntree", "B=replace", "C=mtry", "D=nodesize", "E=maxnodes", "F=classwt", and "G=cutoff". The aliasing is also shown on the map above, as the corresponding dark cells for `mtry:classwt` with `ntree:replace`, `replace:classwt` with `ntree:mtry`, and `replace:mtry` with `ntree:classwt`. 
+From the results of `design.info` in Question 1, we have AB=CF, AC=BF, and AF=BC, where `A=ntree`, `B=mtry`, `C=replace`, `D=nodesize`, `E=classwt`, `F=cutoff`, and `G=maxnodes`. The aliasing is also shown on the map above, as the corresponding dark cells for `mtry:classwt` with `ntree:replace`, `replace:classwt` with `ntree:mtry`, and `replace:mtry` with `ntree:classwt`. 
 
-Therefore, we have the fractional factorial design's performance is best for all main effects and two-factor interactions except these aliasing factors. 
+Therefore, we have the fractional factorial design's performance is best for all main effects and two-factor interactions except these aliasing factors (AB, CF, AC, BF, AF, and BC). 
 
 
 
@@ -123,7 +122,8 @@ Therefore, we have the fractional factorial design's performance is best for all
 
 ```{r}
 # Visualize the aliasing in the design.
-D.alt <- data.frame(alternative.design$design) # Extract the design.
+D.alt <- alternative.design$design # Extract the design.
+
 # Convert factors to -1 and 1
 D.alt <- sapply(D.alt,function(x)(as.integer(x) -1.5)*2 )
 X.alt <- model.matrix(~.^2-1, data.frame(D.alt))
@@ -133,13 +133,14 @@ contrast.vectors.correlations.alt <- cor(X.alt)
 corrplot(contrast.vectors.correlations.alt, type = "full", addgrid.col = "gray",
          tl.col = "black", tl.srt = 90, method = "color", tl.cex=0.5)
 ```
+
 \ 
 
-From the D-optimal Design above, we have most cells with light colors. Therefore, we have the alias among the main effects,between the main effects and the specific interactions, and among the specific interactions are fairly small. 
+From the D-optimal Design above, we have most cells with light colors, which means the strength of correlation between the main effects and interactions are weak. Therefore, we have the degree of aliasing among the main effects,between the main effects and the specific interactions, and among the specific interactions are fairly low.   
 
 \pagebreak
 
-### 2.2 VIF for Fractional Factorial Design  
+### 2.2 VIF for D-Optimal Design  
 ```{r}
 # We need to include the intercept when computing the VIF.
 X.alt <- model.matrix(~.^2, data.frame(D.alt))
@@ -167,11 +168,52 @@ From the VIF plot above, we have there's no factor has VIF greater than 5. Thus,
 \newpage
 # Question 3. Recommend one experimental design between the two options in Question 1. Motivate your decision.  
 
+* We select the D-optimal Design since there's no series multi-collinearity problem or aliasing issue for all main effects and two-factor interactions.  
+
 \newpage 
 # Question 4. Using a commercial software, the TAs and I came up with the experimental design shown in Table 2. How does your recommended design in the previous question compare with this one?
 
-
-
 ```{r}
-source("CrossValidation_RandomForest/CrossValidation_RF.R")
+table2 <- read.csv("Data/Alternative_Experimental_Design.csv")
+head(table2)
 ```
+
+\pagebreak
+### 4.1 Color Map for Table 2 Design
+```{r}
+# Convert factors to -1 and 1
+table2 <- sapply(table2,function(x)(as.integer(as.factor(x)) -2) )
+X.alt <- model.matrix(~.^2-1, data.frame(table2[,-1]))
+
+# Create color map on pairwise correlations.
+contrast.vectors.correlations.alt <- cor(X.alt)
+corrplot(contrast.vectors.correlations.alt, type = "full", addgrid.col = "gray",
+         tl.col = "black", tl.srt = 90, method = "color", tl.cex=0.5)
+```
+\ 
+
+* The experimental design shown in Table2 is 7 factor with 3 levels, however, the design we proposed in Question 1 has only 2 levels for each factor. 
+
+* From the color map above, we have the design in Table 2 has lighter cells for aliasing among main effects with other main effects or interactions. However, since the cells at bottom right corner are darker, we have the degree of aliasing is generally greater for the aliasing among two-factor interactions.  
+
+
+
+\pagebreak
+# Question 5. Collect data using your recommended design in Question 3.
+```{r}
+# import function cv.rf(design, y, X)
+source("CrossValidation_RandomForest/CrossValidation_RF.R")
+# import dataset Cardiovascular
+load("Data/cardiovascular.Rdata")
+```
+```{r}
+# convert the design from factor to numerical values
+design <- as.data.frame(sapply(alternative.design$design, function(x) as.numeric(as.character(x))))
+result <- cv.rf(design, y, X)
+print(result)
+```
+
+
+\newpage
+# Question 6. Conduct a detailed data analysis. What are the influential tuning parameters? What is the final model that links the tuning parameters to the cross-validation accuracy? Does the final model provide a good fit to the data? 
+
