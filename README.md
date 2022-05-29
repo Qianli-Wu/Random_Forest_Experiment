@@ -12,7 +12,7 @@ $ cd Documents   # optional     or other directories (e.g. Downloads, Desktop, .
 ```
 
 ```{shell}
-$ git clone https://github.com/davidgohel/officedown.git
+$ git clone https://github.com/Qianli-Wu/Random_Forest_Experiment.git
 ```
 
 Then, open your Finder and go to the directory you speficied above
