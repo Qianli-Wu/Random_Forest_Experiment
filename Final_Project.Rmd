@@ -14,7 +14,7 @@ header-includes:
   - \posttitle{\end{center}}
 ---
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
 library(AlgDesign)
 library(FrF2)
 library(corrplot)
@@ -126,8 +126,12 @@ corrplot(contrast.vectors.correlations.alt, type = "full", addgrid.col = "gray",
          tl.col = "black", tl.srt = 90, method = "color", tl.cex=0.5)
 ```
 
+\pagebreak  
+##### 2.1.3 VIF for Main Effects of D-Optimal Design    
 
-##### 2.1.3 VIF for Main Effects of D-Optimal Design  
+\ 
+
+
 ```{r}
 # We need to include the intercept when computing the VIF.
 X.alt <- model.matrix(~., data.frame(OD.alt))
@@ -140,27 +144,31 @@ barplot(nrow(X.alt)*var.eff.one, main = "VIF Values", horiz = TRUE, col = "cyan"
 #add vertical line at 5
 abline(v = 5, lwd = 3, lty = 2)
 ```
-
+  
+\   
+  
 From the VIF plot above, we have there's no factor has VIF greater than 5. Thus, we don’t have a severe multi-collineairty or aliasing issue. 
 
 
 \pagebreak
 ### 2.2 Can they estimate all two-parameter interactions?
-
-
 ##### 2.2.1 Color Map for Fractional Factorial Design  
+  
+\  
+
+
 ```{r}
 # Create the model matrix including main effects and two-factor interactions.
-FX.alt <- model.matrix(~.^2-1, data.frame(FD.alt))
+FX.alt <- model.matrix(~.^2, data.frame(FD.alt))
 
 # Create color map on pairwise correlations. 
 contrast.vectors.correlations.alt <- cor(FX.alt)
 corrplot(contrast.vectors.correlations.alt, type = "full", addgrid.col = "gray",
          tl.col = "black", tl.srt = 90, method = "color", tl.cex=0.5)
 ```
-
-\ 
-
+  
+\   
+  
 From the color map above, we get there's alias among some pairs of two-parameter interactions.   
 
 From the results of `design.info` in Question 1, we have AB=CF, AC=BF, and AF=BC, where `A=ntree`, `B=mtry`, `C=replace`, `D=nodesize`, `E=classwt`, `F=cutoff`, and `G=maxnodes`. The aliasing is also shown on the map above, as the corresponding dark cells for `mtry:classwt` with `ntree:replace`, `replace:classwt` with `ntree:mtry`, and `replace:mtry` with `ntree:classwt`. 
@@ -173,7 +181,7 @@ Therefore, we have the fractional factorial design's performance is best for all
 ### 2.1 Color Map for D-optimal Design  
 
 ```{r}
-OX.alt <- model.matrix(~.^2-1, data.frame(OD.alt))
+OX.alt <- model.matrix(~.^2, data.frame(OD.alt))
 
 # Create color map on pairwise correlations.
 contrast.vectors.correlations.alt <- cor(OX.alt)
@@ -188,6 +196,10 @@ From the D-optimal Design above, we have most cells with light colors, which mea
 \pagebreak
 
 ##### 2.2.3 VIF for D-Optimal Design  
+
+\  
+
+
 ```{r}
 # We need to include the intercept when computing the VIF.
 X.alt <- model.matrix(~.^2, data.frame(OD.alt))
@@ -240,6 +252,7 @@ head(table2)
 ```{r}
 # Convert factors to -1 and 1
 table2 <- sapply(table2,function(x)(as.integer(as.factor(x)) -2) )
+table2[,3][table2[,3]==0] <- 1
 X.alt <- model.matrix(~.^2-1, data.frame(table2[,-1]))
 
 # Create color map on pairwise correlations.
@@ -251,7 +264,10 @@ corrplot(contrast.vectors.correlations.alt, type = "full", addgrid.col = "gray",
 
 * The experimental design shown in Table2 is 7 factor with 3 levels, however, the design we proposed in Question 1 has only 2 levels for each factor. 
 
-* From the color map above, we have the design in Table 2 has lighter cells for aliasing among main effects with other main effects or interactions. However, since the cells at bottom right corner are darker, we have the degree of aliasing is generally greater for the aliasing among two-factor interactions.  
+* From the color map above, we have the design in Table 2 has lighter cells for aliasing among main effects with other main effects and there's no alias between main effects and two-parameter interactions. However, since the cells at bottom right corner are darker, we have the degree of aliasing is generally greater then these for our D-optimal design for two-parameter interactions. It is reasonable since proposed design only has 22 runs, which is less then our D-optimal design with 32 runs.  
+
+* Since the proposed design is a 3-level design, it allows quadratic model, which includes $x^2$ as predictors. However, our 2-level D-optimal design doesn't support that. But our design has better performance on estimating two-parameter interactions. 
+
 
 
 
@@ -304,39 +320,6 @@ levels(result$maxnodes) = c(-1,1)
 result <- as.data.frame(sapply(result, function(x) as.numeric(as.character(x))))
 head(result)
 ```
-```{r}
-attach(result)
-# Running Linear Model
-cv.model <- lm(CV~ntree+mtry+replace+nodesize+classwt+cutoff+maxnodes)
-summary(cv.model)
-```
-
-As can be seen, the influential tuning parameters are classwt and, to a lesser extent, cutoff, per the significance level $\alpha = 0.05$. Their p-values for the t-test are lower than 0.05. We run a reduced model next with only these two factors. 
-
-```{r}
-# Running Reduced Model
-cv.model2 <- lm(CV~classwt+cutoff)
-summary(cv.model2)
-```
-
-The classwt and cutoff continue to be significant per $\alpha = 0.05$. For the reduced model, the difference between Multiple and Adjusted R^2 values is a lot smaller, indicating that the reduced model is generally a better fit for the dataset. We now analyse the residuals of this model.
-
-```{r}
-# Analysis of Residuals
-cv.res <- cv.model2$residuals
-cv.fit <- cv.model2$fitted.values
-par(mfrow = c(1,3))
-qqnorm(cv.res)
-qqline(cv.res)
-plot(cv.fit,cv.res, main = "Residuals vs Fitted Values",
-     xlab = "Predicted", ylab = "Residuals")
-
-N <- nrow(result)
-plot(x = 1:N, y = cv.res, xlab = "Run Order",
-     ylab = "Residuals")
-```
-
-Points adhere to the qqline on the Normal Q-Q Plot, apart from at the higher theoretical quantile extremity. The plot of residuals vs fitted values is heteroskedastic around the horizontal, as is the plot of residuals vs run order. We thus conclude that the model does not satisfy all the assumptions of normality. 
 
 
 
@@ -348,11 +331,10 @@ Points adhere to the qqline on the Normal Q-Q Plot, apart from at the higher the
 cv.model <- lm(CV~.^2, data=result.copy)
 summary(cv.model)
 ```
-```{r}
-# Running Reduced Model
-cv.model2 <- lm(CV~(classwt*cutoff+classwt*maxnodes + mtry), data = result)
-summary(cv.model2)
-```
+
+\  
+
+As seen from the output above, there's no significant factors except the intercept under the level of $\alpha=0.05$. The difference between the Multiple and Adjusted R^2 values is substantial, which indicates that the high R^2 value could be due to the inclusion of several independent factors. We would thus need a reduced model.
 
 ### Bayes Information Criterion (BIC)
 We use BIC to avoid overfitting.  
@@ -362,7 +344,7 @@ where $n$ is the number of observations, $k$ is the number of predictors, and $ 
 - For n larger than 8, log(n) > 2, and so this is a greater penalty for complexity than AIC.  
 - BIC favors simpler models than AIC.  
 
-We choose BIC since the **probability** that BIC selects the correct model approaches 1 as the sample size $n$ grows.  
+ 
 ```{r}
 library(leaps)
 Best_Subset <- regsubsets(CV~.^2, data = result, 
@@ -375,7 +357,10 @@ plot(summary_best_subset$bic, xlab = "Number of Variables", ylab = "BIC", type =
 min = which.min(summary_best_subset$bic)
 points(min, summary_best_subset$bic[min], col = "red", cex = 2, pch = 20)
 ```
+  
+\ 
 
+We now select the model with the lowest BIC value.  
 ```{r}
 ### Select Model with least BIC score
 # We first select the best model according to BIC.
@@ -383,125 +368,130 @@ modelwith.minimum.BIC <- which.min(summary_best_subset$bic)
 best.model <- summary_best_subset$which[modelwith.minimum.BIC,][-1]
 # Only keep the predictors are indicated by ‘TRUE’ and our response 'goldDiff'
 keep <- names(best.model[best.model==T])
-# Using 'keep' as a mask to select best predictors in data set
+# Print the selected factors
 a <- paste(keep,sep=" ",collapse=" + ")
 a
 ```
 
+\ 
+
+We now use these predictors to construct a reduced model.
 
 ```{r}
-cv.model.bic <- lm(CV~mtry + nodesize + classwt + cutoff + maxnodes + ntree:mtry + ntree:nodesize + ntree:maxnodes + mtry:replace + mtry:nodesize + mtry:classwt + mtry:cutoff + mtry:maxnodes + replace:maxnodes + nodesize:cutoff + classwt:cutoff + classwt:maxnodes + cutoff:maxnodes, data=result)
-# T-test or Partial F-test
+# construct a reduced model based on BIC criteria
+cv.model.bic <- lm(CV~classwt + cutoff + maxnodes + classwt:cutoff + classwt:maxnodes, data=result)
+# T-test
 summary(cv.model.bic)
 ```
+
+The difference between the Multiple and Adjusted R^2 values is now lower. Under $\alpha=0.05$, all predictors, classwt, cutoff, maxnodes, the interaction between classwt and cutoff, and the interaction between classwt and maxnodes are significant factors. We now analyse the residuals.  
+
+
+### Analysis of Residuals
 ```{r}
-cv.model.bic <- lm(CV~ nodesize + classwt + cutoff + maxnodes + ntree:mtry + ntree:nodesize + mtry:classwt + classwt:cutoff + classwt:maxnodes, data=result)
-# T-test or Partial F-test
-summary(cv.model.bic)
+# Analysis of Residuals
+cv.res <- cv.model.bic$residuals
+cv.fit <- cv.model.bic$fitted.values
+par(mfrow = c(1,3))
+qqnorm(cv.res)
+qqline(cv.res)
+plot(cv.fit,cv.res, main = "Residuals vs Fitted Values",
+     xlab = "Predicted", ylab = "Residuals")
+
+N <- nrow(result)
+plot(x = 1:N, y = cv.res, xlab = "Run Order",
+     ylab = "Residuals")
 ```
 
-### Running Confirmation Tests
 
+We see that the points on the normal Q-Q Plot adhere to the qqline except at extremities. The residuals in the residuals vs fitted are evenly distributed across each fitted value. And the distribution of residuals in the residuals vs run order plots are fairly homoskedastic. Thus, we say for our final modal the assumption of constant variance, independence, and normality are satisfied.  
+
+### Running Confirmation Tests  
+
+Since we can run 35 tests in total and we have already run 32 times, we have 3 runs left for confirmation experiment. 
+
+The final fitted equation is 
+$$
+\hat{y} = 0.622765 - 0.048193 E + 0.028372 F + 0.015964 G + 0.023461 EF + 0.037590 EG
+$$
+where $\hat{y}$ is the predicted response and `A=ntree`, `B=mtry`, `C=replace`, `D=nodesize`, `E=classwt`, `F=cutoff`, and `G=maxnodes`.
+
+Using this equation, we can find the settings that maximize the porosity percentage. To this end, we use the 'optim' function in R. We first define an objective function which we want to maximize.
+
+```{r}
+obj_func <- function(x){
+    pred.y <- 0.622765  - 0.048193 * x[5] + 0.028372 * x[6] + 0.015964*x[7] + 0.023461 *x[5]*x[6] + 0.037590 *x[5]*x[7] 
+    return(-1*pred.y) # Because the 'optim' function minimizes.
+}
+```
+
+
+Now, we use the _optim_ function in R.
 ```{r}
 # First, use optim() to find the optimal setting according to our model
-optim(cv.model.bic)
+optim(par = c(-1, -1, -1, -1,-1,-1,-1), fn = obj_func, lower = -1, upper = 1, method = "L-BFGS-B")
+```
+```{r}
 # Then, construct a dataframe of 7 columns, 1 row, with the optimal setting above
-design.confirm <- data.frame(ntree =1, 
-                mtry = 1, 
-                replace = 1, 
-                nodesize = 1, 
-                classwt = 1, 
+design.confirm <- data.frame(ntree = -1,  
+                mtry = -1, 
+                replace = -1, 
+                nodesize = -1, 
+                classwt = -1, 
                 cutoff = 1,
-                maxnodes = 1)
+                maxnodes = -1)
 head(design.confirm)
+```
+```{r}
 # Then, Get the prediction interval of the optimal setting based on our model
 predict(cv.model.bic, newdata = design.confirm, interval = "predict")
+```
+```{r}
+# Convert the optimal setting to numerical values
+design.confirm <- data.frame(ntree = rep(100,3),
+                mtry = rep(2,3), 
+                replace = rep(0,3), 
+                nodesize = rep(1,3), 
+                classwt = rep(0.5,3), 
+                cutoff = rep(0.8,3),
+                maxnodes = rep(10,3))
+head(design.confirm) 
+```
+```{r}
 # Lastly, run cv.rf() three times with optimal setting (with numerical data) to confirm
+confirm.result <- cv.rf(design.confirm, y, X)
+confirm.result$CV
+mean(confirm.result$CV)
 ```
 
-\pagebreak
-### Analysis for Fractional Factorial Design (Backup)
-```{r}
-# convert the design from factor to numerical values
-fdesign.numerical <- as.data.frame(sapply(my.design, function(x) as.numeric(as.character(x))))
-# randomize the run order
-fdesign.randomized <- fdesign.numerical[sample(1:nrow(design.numerical)),]
-head(fdesign.randomized)
-```
-
-```{r}
-fresult <- cv.rf(fdesign.randomized, y, X)
-# save a copy of result thus no need to run cv.rf again
-fresult.copy <- fresult
-fresult <- fresult.copy
-print(fresult.copy)
-```
-```{r}
-head(fresult)
-```
-
-```{r}
-fresult[,1:7] <- lapply(fresult[,1:7],function(x) as.factor(x))
-```
-```{r}
-# Re-encoding Factors
-levels(fresult$ntree) = c(-1,1)
-levels(fresult$mtry) = c(-1,1)
-levels(fresult$replace) = c(-1,1)
-levels(fresult$nodesize) = c(-1,1)
-levels(fresult$classwt) = c(-1,1)
-levels(fresult$cutoff) = c(-1,1)
-levels(fresult$maxnodes) = c(-1,1)
-
-str(fresult)
-```
-```{r}
-
-# Running Linear Model
-cv.model <- lm(CV~.^2, data=fresult)
-summary(cv.model)
-```
-
-```{r}
-par(mfrow=c(1,2))
-DanielPlot(cv.model, half = T)
-DanielPlot(cv.model, half = F)
-```
+We have the results of confirmation experiments are in the range of our prediction interval (0.608844, 0.7895945).  
+Moreover, the mean of the results (0.6992193) is close to the fitted value 0.6970846.   
 
 
-```{r}
-# Running Reduced Model
-cv.model2 <- lm(CV~(classwt+cutoff+classwt*maxnodes), data = fresult)
-summary(cv.model2)
-```
 
-```{r}
-MEPlot(cv.model)
-```
 
-```{r}
-load("Data/heart.Rdata")
-heart <- cv.rf(design.numerical, y, X)
-heart.copy <- heart
-```
 
-```{r}
-heart[,c("ntree","mtry","replace",
-          "nodesize","classwt","cutoff","maxnodes")] <- lapply(heart[,c("ntree","mtry","replace",
-                                                                         "nodesize","classwt","cutoff","maxnodes")],factor)
-```
-```{r}
-# Re-encoding Factors
-levels(heart$ntree) = c(-1,1)
-levels(heart$mtry) = c(-1,1)
-levels(heart$replace) = c(-1,1)
-levels(heart$nodesize) = c(-1,1)
-levels(heart$classwt) = c(-1,1)
-levels(heart$cutoff) = c(-1,1)
-levels(heart$maxnodes) = c(-1,1)
 
-heart <- as.data.frame(sapply(heart, function(x) as.numeric(as.character(x))))
-heart.model <- lm(CV~.^2, data = heart)
-summary(heart.model)
-```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
